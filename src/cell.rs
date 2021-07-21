@@ -1,27 +1,5 @@
 use std::fmt::Display;
 use crate::Position;
-// use std::io::{self, Write};
-
-// use std::fmt::{Display, write};
-
-// pub enum CellType {
-//     Number(f64),
-//     String(String),
-// }
-
-// impl Display for CellType{
-//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-//         match self{
-//             CellType::Number(x) => write!(f, "{}", x),
-//             CellType::String(s) => write!(f, "{}", s),
-//         }
-//     }
-// }
-
-// pub enum CellContent {
-//     String(String),
-//     Number(f64)
-// }
 
 #[derive(PartialEq,Clone, Debug)]
 pub enum DataType{
@@ -67,10 +45,6 @@ impl DataType{
         }
     }
 
-    pub fn reset(&mut self){
-        self.switch_type(DataType::Empty)
-    }
-
     pub fn insert(&mut self, c:char){
         match self {
             DataType::String(x) => x.push(c),
@@ -96,7 +70,6 @@ impl DataType{
             DataType::Float(_) => DataType::Float(f64::default()),
             DataType::String(_) => DataType::String(String::default()),
             DataType::Empty => DataType::Empty,
-            
         };
     }
 
@@ -105,33 +78,17 @@ impl DataType{
     }
 
     pub fn is_string(&self) -> bool{
-        if let DataType::String(_) = *self{
-            true
-        }else{
-            false
-        }
+        matches!(*self, DataType::String(_))
     }
     pub fn is_int(&self) -> bool{
-        if let DataType::Int(_) = *self{
-            true
-        }else{
-            false
-        }
+        matches!(*self, DataType::Int(_))
     }
     pub fn is_float(&self) -> bool{
-        if let DataType::Float(_) = *self{
-            true
-        }else{
-            false
-        }
+        matches!(*self, DataType::Float(_))
     }
 
     pub fn is_bool(&self) -> bool{
-        if let DataType::Bool(_) = *self{
-            true
-        }else{
-            false
-        }
+        matches!(*self, DataType::Bool(_))
     }
 }
 
@@ -143,7 +100,7 @@ pub struct Cell{
 impl Default for Cell{
     fn default() -> Self {
         Self{
-            val: DataType::String(String::from("")),
+            val: DataType::Empty,
             pos: Position{x:0,y:0}
         }
     }
@@ -162,6 +119,9 @@ impl Cell{
     pub fn insert(&mut self, c: char){
         match &self.val{
             DataType::String(s) => self.val.insert(c),
+            DataType::Empty => {
+                self.val = DataType::String(String::from(c));
+            }
             _ => (),
         }
     }
@@ -174,15 +134,27 @@ impl Cell{
     }
 
     pub fn reset(&mut self){
-        self.val.reset()
+        self.val = DataType::Empty
+    }
+
+    pub fn render(&self, max_len: usize) -> String{
+        let mut val = match &self.val{
+            DataType::Int(s) => s.to_string(),
+            DataType::Float(s) => s.to_string(),
+            DataType::String(s) => s.to_string(),
+            DataType::Bool(s) => s.to_string(),
+            DataType::Empty => String::default(),
+        };
+        if val.len() > max_len{
+            val.truncate(max_len.saturating_sub(2));
+            val.push_str("..");
+        }
+        val
     }
 
     fn update_type(&mut self){
-        if let DataType::String(s) = &self.val{
-            match s.as_str().parse::<f64>(){
-                Ok(x) => self.val = DataType::Float(x),
-                Err(_) => (),
-            }
+        if self.val.is_string(){
+            
         }
     }
 }

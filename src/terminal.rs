@@ -36,6 +36,12 @@ impl Terminal{
         self.size
     }
 
+    pub fn update_size(&mut self, width: usize, height: usize) -> Result<(), ErrorKind>{
+        self.size.width = width;
+        self.size.height = height;
+        Ok(())
+    }
+
     pub fn leave(){
         terminal::disable_raw_mode().unwrap();
         execute!(stdout(), terminal::LeaveAlternateScreen).unwrap();
@@ -75,10 +81,10 @@ impl Terminal{
     }
 
 
-    pub fn read_key() -> Result<Event, ErrorKind>{
+    pub fn read_event() -> Result<Event, ErrorKind>{
         loop{
-            if let Ok(key) = read(){
-                return Ok(key);
+            if let Ok(event) = read(){
+                return Ok(event);
             }
         }
     }
