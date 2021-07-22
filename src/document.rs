@@ -18,7 +18,7 @@ impl Document{
         let mut rows: Vec<Row> = Vec::new();
         let mut len: usize = 0;
         for row in content.lines(){
-            let cells: Vec<Cell> = row.split(";").map(|s| Cell::from(s.to_string())).collect();
+            let cells: Vec<Cell> = row.split(';').map(|s| Cell::from(s.to_string())).collect();
             let row_len = cells.len();
             rows.push(Row{cells, len: row_len});
             len+=1;
@@ -77,13 +77,13 @@ impl Document{
         self.len = self.rows.len()
     }
 
-    fn max_row_len(&self) -> usize{
+    pub fn col_count(&self) -> usize{
         let max = self.rows.iter().map(|r| r.cells.len()).max().unwrap_or(0);
         max
     }
 
     pub fn add_column(&mut self){
-        let max_len = self.max_row_len();
+        let max_len = self.col_count();
         for i in 0..self.len{
             let row_len = self.rows[i].len;
             if row_len <= max_len{
@@ -92,6 +92,24 @@ impl Document{
 
             self.rows[i].cells.push(Cell::default());
         }
+    }
+
+    pub fn del_col(&mut self, at: usize){
+        for i in 0..self.len{
+            let row_len = self.rows[i].len;
+            if at <= row_len{
+                self.rows[i].cells.remove(at);
+            }
+        }
+    }
+
+    pub fn is_col_empty(&self, at:usize) -> bool{
+        for i in 0..self.len{
+            if self.cell_exist(&Position{x: at, y:i}) && !self.rows[i].cells[at].val.is_empy(){
+                return false;
+            }
+        }
+        return true;
     }
 
     pub fn add_row(&mut self){

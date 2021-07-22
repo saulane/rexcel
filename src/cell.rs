@@ -51,30 +51,30 @@ impl DataType{
                 x.push(c);
                 if x.starts_with('='){
                     if let Ok(x) = x.parse::<f64>(){
-                        self.switch_type(DataType::Float(x));
+                        self.switch_type(&DataType::Float(x));
                     };
                 }
             },
             DataType::Empty => {
-                self.switch_type(DataType::String(String::default()));
+                self.switch_type(&DataType::String(String::default()));
                 self.insert(c);
             },
             _ => ()
         }
     }
 
-    pub fn delete(&mut self, at:usize){
+    pub fn delete(&mut self, _at:usize){
         match self{
             DataType::String(x) => {x.pop();},
             _ => ()
         }
     }
 
-    fn switch_type(&mut self, nt: DataType){
+    fn switch_type(&mut self, nt: &DataType){
         *self = match nt{
             DataType::Bool(_) => DataType::Bool(bool::default()),
             DataType::Int(_) => DataType::Int(i64::default()),
-            DataType::Float(f) => DataType::Float(f),
+            DataType::Float(f) => DataType::Float(*f),
             DataType::String(_) => DataType::String(String::default()),
             DataType::Empty => DataType::Empty,
         };
@@ -126,7 +126,7 @@ impl From<String> for Cell{
 impl Cell{
     pub fn insert(&mut self, c: char){
         match &self.val{
-            DataType::String(s) => self.val.insert(c),
+            DataType::String(_) => self.val.insert(c),
             DataType::Empty => {
                 self.val = DataType::String(String::from(c));
             }
@@ -136,7 +136,7 @@ impl Cell{
 
     pub fn delete(&mut self, at:usize){
         match &self.val{
-            DataType::String(s) => self.val.delete(at),
+            DataType::String(_) => self.val.delete(at),
             _ => (),
         }
     }
@@ -153,16 +153,19 @@ impl Cell{
             DataType::Bool(s) => s.to_string(),
             DataType::Empty => String::default(),
         };
-        if val.len() > max_len{
+
+        if max_len == 0{
+            return val
+        }else if val.len() > max_len{
             val.truncate(max_len.saturating_sub(2));
             val.push_str("..");
         }
         val
     }
 
-    fn update_type(&mut self){
-        if self.val.is_string(){
+    // fn update_type(&mut self){
+    //     if self.val.is_string(){
             
-        }
-    }
+    //     }
+    // }
 }

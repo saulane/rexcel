@@ -28,23 +28,23 @@ impl Status{
     }
 }
 
-pub enum Direction{
-    Up,
-    Down,
-    Left,
-    Right
-}
+// pub enum Direction{
+//     Up,
+//     Down,
+//     Left,
+//     Right
+// }
 
-impl Position{
-    pub fn shift(&mut self, dir: Direction){
-        match dir{
-            Direction::Up => self.y.saturating_sub(1),
-            Direction::Down => self.y.saturating_add(1),
-            Direction::Left => self.y.saturating_sub(1),
-            Direction::Right => self.y.saturating_add(1),
-        };
-    }
-}
+// impl Position{
+//     pub fn shift(&mut self, dir: Direction){
+//         match dir{
+//             Direction::Up => self.y.saturating_sub(1),
+//             Direction::Down => self.y.saturating_add(1),
+//             Direction::Left => self.y.saturating_sub(1),
+//             Direction::Right => self.y.saturating_add(1),
+//         };
+//     }
+// }
 
 pub struct Editor{
     pub terminal: Terminal,
@@ -65,9 +65,8 @@ impl Editor{
         let status: Status = Status::default();
         let document = if args.len() > 1{
             let filename = &args[1];
-            let doc = Document::open(&filename);
-            if doc.is_ok(){
-                doc.unwrap()
+            if let Ok(doc) = Document::open(&filename){
+                doc
             }else{
                 Document::default()
             }
@@ -94,11 +93,11 @@ impl Editor{
 
         while !self.quit {
             if let Err(error) = self.update(){
-                die(error);
+                die(&error);
             }
 
             if let Err(error) = self.process_input() {
-                die(error);
+                die(&error);
             }
         }
 
@@ -126,22 +125,21 @@ impl Editor{
             Event::Key(KeyEvent{code: KeyCode::Char('q'), modifiers: KeyModifiers::CONTROL}) => {
                 self.quit();
             },
-            Event::Key(KeyEvent{code: KeyCode::Char('s'), modifiers}) => {
-                if modifiers.contains(KeyModifiers::CONTROL){
-                    if modifiers.contains(KeyModifiers::ALT){
-                        self.save_as();
-                    }else{
-                        self.save();
-                    }
-                }
-            },
             Event::Key(KeyEvent{code: KeyCode::Char('x'), modifiers: KeyModifiers::CONTROL}) => self.cut(&curr_cell),
             Event::Key(KeyEvent{code: KeyCode::Char('c'), modifiers: KeyModifiers::CONTROL}) => self.copy(&curr_cell),
             Event::Key(KeyEvent{code: KeyCode::Char('v'), modifiers: KeyModifiers::CONTROL}) => self.paste(&curr_cell),
             Event::Key(KeyEvent{code: KeyCode::Backspace, modifiers: _}) => {
                 self.document.delete(&self.cell_position);
             },
-            Event::Key(KeyEvent{code: KeyCode::Char(c), modifiers: _}) => {
+            Event::Key(KeyEvent{code: KeyCode::Char(c), modifiers}) => {
+                if c == 's' && modifiers.contains(KeyModifiers::CONTROL){
+                    if modifiers.contains(KeyModifiers::ALT){
+                        self.save_as();
+                    }else{
+                        self.save();
+                    }
+                    return Ok(());
+                }
                 self.document.insert(&self.cell_position, c);
             },
             Event::Key(KeyEvent{code: KeyCode::Delete, modifiers: _}) => {
@@ -268,9 +266,10 @@ impl Editor{
 
     fn draw_edit_line(&mut self) -> Result<(), std::io::Error>{
         let curr_pos: &Position = &self.cell_position;
-        match self.document.cell_exist(curr_pos){
-            true => write!(stdout(), "{}", self.document.get_cell(curr_pos).unwrap().val),
-            false => write!(stdout(), ""),
+        if self.document.cell_exist(curr_pos){
+            write!(stdout(), "{}", self.document.get_cell(curr_pos).unwrap().val)
+        }else{
+            write!(stdout(), "")
         }
     }
 
@@ -283,12 +282,8 @@ impl Editor{
         if self.document.cell_exist(p){
             let content = &self.document.rows[p.y].cells[p.x].render(9);
             let len = content.len();
-            let margin_right: usize = (9 as usize).saturating_sub(len);
-            if content.len() > 9{
-                write!(stdout(), "{}{}", &content, &" ".repeat(margin_right))?;
-            }else{
-                write!(stdout(), "{}{}", &content, &" ".repeat(margin_right))?;
-            }
+            let margin_right: usize = 9_usize.saturating_sub(len);
+            write!(stdout(), "{}{}", &content, &" ".repeat(margin_right))?;
         }else{
             write!(stdout(), "{}", &" ".repeat(9))?;
         }
@@ -341,11 +336,23 @@ impl Editor{
     fn draw_status_message(&mut self) -> Result<(), std::io::Error>{
         Terminal::goto(&Position{x:0,y:0});
         Terminal::clear_line();
+        let size = self.terminal.size();
+
+        let helper_message = "CTRL + Q: Quit | CTRL + S: Save | CTRL + ALT + S: Save as".to_string();
+        let helper_message_len = helper_message.len();
 
         if self.status.message.is_empty(){
-            write!(stdout(), "Editing: {}\r\n", self.document.file_name.as_ref().unwrap_or(&"[No Name]".to_string()))?;
+            write!(stdout(), "Editing: {}", self.document.file_name.as_ref().unwrap_or(&"[No Name]".to_string()))?;
         }else{
             write!(stdout(), "{}", self.status.message)?;
+        }
+
+        if size.width > 2*helper_message_len{
+            Terminal::goto(&Position{x: size.width.saturating_sub(helper_message_len), y:0});
+            Terminal::set_bg_color(Color::White);
+            Terminal::set_fg_color(Color::Black);
+            write!(stdout(), "{}", helper_message)?;
+            Terminal::reset_colors();
         }
 
         Ok(())
@@ -353,19 +360,19 @@ impl Editor{
 
     fn draw_header(&mut self) -> Result<(), std::io::Error>{
         let alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-        let cols: usize = self.terminal.size().width.saturating_sub(5)/9;
+        let cols: usize = self.document.col_count();
 
         let headers: Vec<String>= if self.header {
             let col_titles = self.document.rows[0].cells.iter().map(|c| c.render(9)).collect::<Vec<String>>();
-            let lens = col_titles.iter().map(|t| t.len()).collect::<Vec<usize>>();
-            let margin = lens.iter().map(|l| (9 as usize).saturating_sub(*l)/2).collect::<Vec<usize>>();
-            let headers_str = col_titles.iter().enumerate().map(|i| format!("{}{}{}", &" ".repeat(margin[i.0]),i.1, &" ".repeat((9 as usize).saturating_sub(lens[i.0].saturating_add(margin[i.0]))))).collect::<Vec<String>>();
+            let lens = col_titles.iter().map(std::string::String::len).collect::<Vec<usize>>();
+            let margin = lens.iter().map(|l| 9_usize.saturating_sub(*l)/2).collect::<Vec<usize>>();
+            let headers_str = col_titles.iter().enumerate().map(|i| format!("{}{}{}", &" ".repeat(margin[i.0]),i.1, &" ".repeat(9_usize.saturating_sub(lens[i.0].saturating_add(margin[i.0]))))).collect::<Vec<String>>();
             headers_str
         }else{
             let mut headers_str: Vec<String> = Vec::new();
             let alphabet_chars = alphabet.chars().collect::<Vec<char>>();
-            for i in 0..cols{
-                let h_fmt = format!("    {}    ", alphabet_chars[i]);
+            for i in alphabet_chars.iter().take(cols){
+                let h_fmt = format!("    {}    ", i);
                 headers_str.push(h_fmt);
             }
             headers_str
@@ -384,6 +391,8 @@ impl Editor{
 
             write!(stdout(), "{}", i.1)?;
         }
+
+        Terminal::reset_colors();
         Ok(())
     }
 
@@ -393,21 +402,18 @@ impl Editor{
             self.status = Status{message:format!("{}{}", &message,&result)};
             self.update()?;
             let event = Terminal::read_event()?;
-            match event{
-                Event::Key(KeyEvent { code: key, modifiers:_}) => {
-                    match key{
-                        KeyCode::Char(c) => result.push(c),
-                        KeyCode::Backspace => {result.pop();},
-                        KeyCode::Enter => break,
-                        KeyCode::Esc => {
-                            result.truncate(0);
-                            break;
-                        },
-                        _ => ()
-                    };
-                    callback(self,key, &result);
-                },
-                _ => ()
+            if let Event::Key(KeyEvent { code: key, modifiers: _ }) = event{
+                match key{
+                    KeyCode::Char(c) => result.push(c),
+                    KeyCode::Backspace => {result.pop();},
+                    KeyCode::Enter => break,
+                    KeyCode::Esc => {
+                        result.truncate(0);
+                        break;
+                    },
+                    _ => ()
+                };
+                callback(self,key, &result);
             }
         }
 
@@ -418,7 +424,7 @@ impl Editor{
     }
 }
 
-fn die(e: std::io::Error){
+fn die(e: &std::io::Error){
     Terminal::clear();
     panic!("{}", e);
 }

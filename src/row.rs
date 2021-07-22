@@ -25,7 +25,7 @@ impl Row{
     }
 
     pub fn stringify(&self, sep: &str) -> String{
-        self.cells.iter().map(|cell| cell.val.to_string()).collect::<Vec<String>>().join(sep)
+        self.cells.iter().map(|cell| cell.render(0)).collect::<Vec<String>>().join(sep)
     }
 
     pub fn insert(&mut self, c: char, at: usize){
