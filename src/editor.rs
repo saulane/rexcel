@@ -7,8 +7,9 @@ use std::env;
 
 use crate::Terminal;
 use crate::Document;
+use crate::Cell;
 
-#[derive(Default)]
+#[derive(Default, Clone, Copy)]
 pub struct Position{
     pub x: usize,
     pub y: usize
@@ -50,6 +51,9 @@ pub struct Editor{
     pub cursor_position: Position,
     pub cell_position: Position,
     pub document: Document,
+    clipboard: Option<Cell>,
+    offset: Position,
+    header: bool,
     status: Status,
     quit: bool
 }
@@ -57,6 +61,7 @@ pub struct Editor{
 impl Editor{
     pub fn new() -> Result<Self, ErrorKind>{
         let args: Vec<String> = env::args().collect();
+        let header: bool = args.contains(&"--header".to_string());
         let status: Status = Status::default();
         let document = if args.len() > 1{
             let filename = &args[1];
@@ -75,6 +80,9 @@ impl Editor{
             cursor_position: Position{x:5,y:3},
             cell_position: Position{x:0,y:0},
             document,
+            offset: Position::default(),
+            clipboard: None,
+            header,
             status,
             quit: false,
         })
@@ -98,6 +106,7 @@ impl Editor{
     }
 
     fn process_input(&mut self) -> Result<(), ErrorKind>{
+        let curr_cell = self.cell_position;
         match Terminal::read_event()?{
             Event::Resize(width, height) => {
                 self.terminal.update_size(width as usize, height as usize)?;
@@ -126,6 +135,9 @@ impl Editor{
                     }
                 }
             },
+            Event::Key(KeyEvent{code: KeyCode::Char('x'), modifiers: KeyModifiers::CONTROL}) => self.cut(&curr_cell),
+            Event::Key(KeyEvent{code: KeyCode::Char('c'), modifiers: KeyModifiers::CONTROL}) => self.copy(&curr_cell),
+            Event::Key(KeyEvent{code: KeyCode::Char('v'), modifiers: KeyModifiers::CONTROL}) => self.paste(&curr_cell),
             Event::Key(KeyEvent{code: KeyCode::Backspace, modifiers: _}) => {
                 self.document.delete(&self.cell_position);
             },
@@ -158,6 +170,34 @@ impl Editor{
             self.status = Status::from("File saved successfully.".to_string());
         }else{
             self.status = Status::from("Error saving file.".to_string());
+        }
+    }
+
+    fn cut(&mut self, p: &Position){
+        if self.document.cell_exist(p){
+            self.clipboard = Some(self.document.rows[p.y].cells[p.x].clone());
+            self.document.rows[p.y].cells[p.x].reset();
+
+            self.status = Status::from("Cell Cut".to_string());
+
+        }
+    }
+
+    fn copy(&mut self, p: &Position){
+        if self.document.cell_exist(p){
+            let new_cell = self.document.rows[p.y].cells[p.x].clone();
+            self.clipboard = Some(new_cell);
+
+            self.status = Status::from("Cell Copied".to_string());
+        }
+    }
+
+    fn paste(&mut self, p: &Position){
+        if self.clipboard.is_some(){
+            self.document.insert_cell(p, self.clipboard.as_ref().unwrap());
+
+            self.status = Status::from("Cell Pasted".to_string());
+
         }
     }
 
@@ -201,6 +241,7 @@ impl Editor{
     }
 
     fn move_cursor(&mut self, key: KeyCode){
+        let size = self .terminal.size();
         match key{
             KeyCode::Left => {
                 self.cell_position.x = self.cell_position.x.saturating_sub(1);
@@ -209,10 +250,17 @@ impl Editor{
                 self.cell_position.x = self.cell_position.x.saturating_add(1);
             },
             KeyCode::Up => {
+                if self.cell_position.y.saturating_sub(self.offset.y) == 0 && self.offset.y > 0{
+                    self.offset.y = self.offset.y.saturating_sub(1);
+                }
                 self.cell_position.y = self.cell_position.y.saturating_sub(1);
             },
             KeyCode::Down => {
+                if self.cell_position.y.saturating_sub(self.offset.y) == size.height.saturating_sub(1){
+                    self.offset.y = self.offset.y.saturating_add(1);
+                }
                 self.cell_position.y = self.cell_position.y.saturating_add(1);
+                
             },
             _ => ()
         }
@@ -275,25 +323,13 @@ impl Editor{
 
     fn draw_grid(&mut self) -> Result<(), std::io::Error>{
         let size = self.terminal.size();
-        let alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
-        write!(stdout(), "      ")?;
-        for i in 0..size.width.saturating_sub(5)/9{
-            if i == self.cell_position.x{
-                Terminal::set_bg_color(Color::Black);
-                Terminal::set_fg_color(Color::White);
-                write!(stdout(), "    {}    ", &alphabet.chars().collect::<Vec<char>>()[i])?;
-            }else{
-                Terminal::set_bg_color(Color::White);
-                Terminal::set_fg_color(Color::Black);
-                write!(stdout(), "    {}    ", &alphabet.chars().collect::<Vec<char>>()[i])?;
-            }
-        }
+        self.draw_header()?;
         write!(stdout(), "\r\n")?;
 
         Terminal::reset_colors();
 
-        for i in 0..size.height.saturating_sub(4){
+        for i in self.offset.y..size.height.saturating_add(self.offset.y){
             Terminal::clear_line();
             self.draw_row(i)?;
             // write!(stdout(), "\u{2502} {}\r\n", i/2)?;
@@ -312,6 +348,42 @@ impl Editor{
             write!(stdout(), "{}", self.status.message)?;
         }
 
+        Ok(())
+    }
+
+    fn draw_header(&mut self) -> Result<(), std::io::Error>{
+        let alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        let cols: usize = self.terminal.size().width.saturating_sub(5)/9;
+
+        let headers: Vec<String>= if self.header {
+            let col_titles = self.document.rows[0].cells.iter().map(|c| c.render(9)).collect::<Vec<String>>();
+            let lens = col_titles.iter().map(|t| t.len()).collect::<Vec<usize>>();
+            let margin = lens.iter().map(|l| (9 as usize).saturating_sub(*l)/2).collect::<Vec<usize>>();
+            let headers_str = col_titles.iter().enumerate().map(|i| format!("{}{}{}", &" ".repeat(margin[i.0]),i.1, &" ".repeat((9 as usize).saturating_sub(lens[i.0].saturating_add(margin[i.0]))))).collect::<Vec<String>>();
+            headers_str
+        }else{
+            let mut headers_str: Vec<String> = Vec::new();
+            let alphabet_chars = alphabet.chars().collect::<Vec<char>>();
+            for i in 0..cols{
+                let h_fmt = format!("    {}    ", alphabet_chars[i]);
+                headers_str.push(h_fmt);
+            }
+            headers_str
+        };
+        //Columns Index Margin
+        write!(stdout(), "      ")?;
+
+        for i in headers.iter().enumerate(){
+            if i.0 == self.cell_position.x{
+                Terminal::set_bg_color(Color::Black);
+                Terminal::set_fg_color(Color::White);
+            }else{
+                Terminal::set_bg_color(Color::White);
+                Terminal::set_fg_color(Color::Black);
+            }
+
+            write!(stdout(), "{}", i.1)?;
+        }
         Ok(())
     }
 

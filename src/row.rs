@@ -1,6 +1,5 @@
 use crate::Cell;
 
-
 pub struct Row{
     pub cells: Vec<Cell>,
     pub len: usize,
@@ -35,6 +34,13 @@ impl Row{
         }
 
         self.cells[at].insert(c)
+    }
+
+    pub fn insert_cell(&mut self, at: usize, cell: &Cell){
+        if self.len <= at{
+            self.fill(at.saturating_sub(self.len).saturating_add(1));
+        }
+        self.cells[at] = cell.clone();
     }
 
     pub fn delete(&mut self, at: usize){

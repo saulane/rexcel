@@ -37,8 +37,8 @@ impl Terminal{
     }
 
     pub fn update_size(&mut self, width: usize, height: usize) -> Result<(), ErrorKind>{
-        self.size.width = width;
-        self.size.height = height;
+        let new_size = Size{width, height};
+        self.size = new_size;
         Ok(())
     }
 

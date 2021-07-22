@@ -51,6 +51,13 @@ impl Document{
         self.rows[at.y].insert(c, at.x)
     }
 
+    pub fn insert_cell(&mut self, at: &Position, cell: &Cell){
+        if self.rows.len() <= at.y{
+            self.fill(at.y.saturating_sub(self.len).saturating_add(1));
+        }
+        self.rows[at.y].insert_cell(at.x, cell);
+    }
+
     pub fn delete(&mut self, at:&Position){
         if self.rows.len() <= at.y{
             return;
@@ -61,13 +68,34 @@ impl Document{
 
     pub fn fill(&mut self, n: usize){
         for _ in 0..n{
-            self.rows.push(Row::default())
+            self.add_row();
         }
         self.update_len()
     }
 
     fn update_len(&mut self){
         self.len = self.rows.len()
+    }
+
+    fn max_row_len(&self) -> usize{
+        let max = self.rows.iter().map(|r| r.cells.len()).max().unwrap_or(0);
+        max
+    }
+
+    pub fn add_column(&mut self){
+        let max_len = self.max_row_len();
+        for i in 0..self.len{
+            let row_len = self.rows[i].len;
+            if row_len <= max_len{
+                self.rows[i].fill(max_len.saturating_sub(row_len));
+            }
+
+            self.rows[i].cells.push(Cell::default());
+        }
+    }
+
+    pub fn add_row(&mut self){
+        self.rows.push(Row::default());
     }
 
     pub fn cell_exist(&self, p: &Position) -> bool{

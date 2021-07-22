@@ -47,7 +47,14 @@ impl DataType{
 
     pub fn insert(&mut self, c:char){
         match self {
-            DataType::String(x) => x.push(c),
+            DataType::String(x) => {
+                x.push(c);
+                if x.starts_with('='){
+                    if let Ok(x) = x.parse::<f64>(){
+                        self.switch_type(DataType::Float(x));
+                    };
+                }
+            },
             DataType::Empty => {
                 self.switch_type(DataType::String(String::default()));
                 self.insert(c);
@@ -67,7 +74,7 @@ impl DataType{
         *self = match nt{
             DataType::Bool(_) => DataType::Bool(bool::default()),
             DataType::Int(_) => DataType::Int(i64::default()),
-            DataType::Float(_) => DataType::Float(f64::default()),
+            DataType::Float(f) => DataType::Float(f),
             DataType::String(_) => DataType::String(String::default()),
             DataType::Empty => DataType::Empty,
         };
@@ -92,6 +99,7 @@ impl DataType{
     }
 }
 
+#[derive(Clone)]
 pub struct Cell{
     pub val: DataType,
     pub pos: Position,
