@@ -1,6 +1,7 @@
 use crate::Row;
 use crate::Cell;
 use crate::Position;
+use crate::SearchDirection;
 
 use std::fs::{self, File};
 use std::io::Write;
@@ -13,6 +14,9 @@ pub struct Document{
 }
 
 impl Document{
+
+    // #Errors
+    // Will return an error when it can't read the file to a string
     pub fn open(filename: &str) -> Result<Self, std::io::Error>{
         let content = fs::read_to_string(filename)?;
         let mut rows: Vec<Row> = Vec::new();
@@ -31,6 +35,8 @@ impl Document{
         })
     }
 
+    // #Errors
+    // Will return an error when writing the file to the disk fail
     pub fn save(&mut self) -> Result<(), std::io::Error>{
         if let Some(filename) = &self.file_name{
             let mut file = File::create(filename)?;
@@ -64,6 +70,43 @@ impl Document{
         }
 
         self.rows[at.y].delete(at.x)
+    }
+
+    pub fn find(&self, query: &str, curr_position: &Position, direction: SearchDirection) -> Option<Position>{
+        if curr_position.y > self.len{
+            return None
+        }
+
+        let mut position = Position{x: curr_position.x, y:curr_position.y};
+        
+        let start = if direction == SearchDirection::Forward {
+            curr_position.y
+        } else {
+            0
+        };
+        let end = if direction == SearchDirection::Forward {
+            self.len
+        } else {
+            curr_position.y.saturating_add(1)
+        };
+        for _ in start..end {
+            if let Some(row) = self.rows.get(position.y) {
+                if let Some(x) = row.find(&query, position.x, direction) {
+                    position.x = x;
+                    return Some(position);
+                }
+                if direction == SearchDirection::Forward {
+                    position.y = position.y.saturating_add(1);
+                    position.x = 0;
+                } else {
+                    position.y = position.y.saturating_sub(1);
+                    position.x = self.rows[position.y].len;
+                }
+            } else {
+                return None;
+            }
+        }
+        None
     }
 
     pub fn fill(&mut self, n: usize){
@@ -106,10 +149,10 @@ impl Document{
     pub fn is_col_empty(&self, at:usize) -> bool{
         for i in 0..self.len{
             if self.cell_exist(&Position{x: at, y:i}) && !self.rows[i].cells[at].val.is_empy(){
-                return false;
+                return false
             }
         }
-        return true;
+        true
     }
 
     pub fn add_row(&mut self){
@@ -117,17 +160,14 @@ impl Document{
     }
 
     pub fn cell_exist(&self, p: &Position) -> bool{
-        if p.y < self.len && p.x < self.rows[p.y].len {
-            true
-        }else{
-            false
-        }
+        p.y < self.len && p.x < self.rows[p.y].len
     }
 
     pub fn get_cell(&self, p: &Position) -> Option<&Cell>{
-        match self.cell_exist(p){
-            true => Some(&self.rows[p.y].cells[p.x]),
-            false => None,
+        if self.cell_exist(p){
+            self.rows[p.y].cells.get(p.x)
+        }else{
+            None
         }
     }
 }

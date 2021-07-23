@@ -1,4 +1,4 @@
-use crate::Cell;
+use crate::{Cell, SearchDirection};
 
 pub struct Row{
     pub cells: Vec<Cell>,
@@ -51,6 +51,38 @@ impl Row{
         let len = self.cells[at].val.len();
 
         self.cells[at].delete(len)
+    }
+
+    pub fn find(&self, query: &str, at:usize, direction: SearchDirection) -> Option<usize>{
+        if at > self.len || query.is_empty(){
+            return None;
+        }
+        let start = if direction == SearchDirection::Forward {
+            at
+        } else {
+            0
+        };
+        let end = if direction == SearchDirection::Forward {
+            self.len
+        } else {
+            at
+        };
+
+        if direction == SearchDirection::Forward{
+            for i in start..end{
+                if self.cells[i].val.to_string().contains(query){
+                    return Some(i)
+                }
+            }
+        }else{
+            for i in (start..end).rev(){
+                if self.cells[i].val.to_string().contains(query){
+                    return Some(i)
+                }
+            }
+        }
+
+        None
     }
 
     pub fn fill(&mut self, n: usize){

@@ -1,4 +1,6 @@
 use std::fmt::Display;
+use crossterm::style::Color;
+
 use crate::Position;
 
 #[derive(PartialEq,Clone, Debug)]
@@ -160,12 +162,7 @@ impl Cell{
             val.truncate(max_len.saturating_sub(2));
             val.push_str("..");
         }
+        // format!("{}{}", crossterm::style::SetForegroundColor(Color::Red), val)
         val
     }
-
-    // fn update_type(&mut self){
-    //     if self.val.is_string(){
-            
-    //     }
-    // }
 }

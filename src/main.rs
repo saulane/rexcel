@@ -1,3 +1,7 @@
+#![warn(
+    clippy::pedantic,
+)]
+
 mod terminal;
 mod editor;
 mod cell;
@@ -6,6 +10,7 @@ mod document;
 
 use editor::Editor;
 pub use editor::Position;
+pub use editor::SearchDirection;
 pub use terminal::Terminal;
 pub use cell::Cell;
 pub use row::Row;

@@ -2,6 +2,7 @@ use crossterm::event::{Event, KeyCode, KeyModifiers, KeyEvent};
 use crossterm::ErrorKind;
 use crossterm::style::Color;
 
+use std::cmp::max;
 use std::io::{Write, stdout};
 use std::env;
 
@@ -13,6 +14,12 @@ use crate::Cell;
 pub struct Position{
     pub x: usize,
     pub y: usize
+}
+
+#[derive(PartialEq, Clone, Copy)]
+pub enum SearchDirection{
+    Forward,
+    Backward
 }
 
 #[derive(Default)]
@@ -27,24 +34,6 @@ impl Status{
         }
     }
 }
-
-// pub enum Direction{
-//     Up,
-//     Down,
-//     Left,
-//     Right
-// }
-
-// impl Position{
-//     pub fn shift(&mut self, dir: Direction){
-//         match dir{
-//             Direction::Up => self.y.saturating_sub(1),
-//             Direction::Down => self.y.saturating_add(1),
-//             Direction::Left => self.y.saturating_sub(1),
-//             Direction::Right => self.y.saturating_add(1),
-//         };
-//     }
-// }
 
 pub struct Editor{
     pub terminal: Terminal,
@@ -89,8 +78,6 @@ impl Editor{
 
     pub fn run(&mut self){
         Terminal::enter();
-        Terminal::hide_cursor();
-
         while !self.quit {
             if let Err(error) = self.update(){
                 die(&error);
@@ -125,6 +112,7 @@ impl Editor{
             Event::Key(KeyEvent{code: KeyCode::Char('q'), modifiers: KeyModifiers::CONTROL}) => {
                 self.quit();
             },
+            Event::Key(KeyEvent{code: KeyCode::Char('f'), modifiers: KeyModifiers::CONTROL}) => self.search(),
             Event::Key(KeyEvent{code: KeyCode::Char('x'), modifiers: KeyModifiers::CONTROL}) => self.cut(&curr_cell),
             Event::Key(KeyEvent{code: KeyCode::Char('c'), modifiers: KeyModifiers::CONTROL}) => self.copy(&curr_cell),
             Event::Key(KeyEvent{code: KeyCode::Char('v'), modifiers: KeyModifiers::CONTROL}) => self.paste(&curr_cell),
@@ -216,7 +204,7 @@ impl Editor{
     }
 
     fn update(&mut self) -> Result<(), std::io::Error>{
-        // Terminal::hide_cursor();
+        Terminal::hide_cursor();
         Terminal::goto(&Position::default());
         self.draw_status_message()?;
         
@@ -261,6 +249,62 @@ impl Editor{
                 
             },
             _ => ()
+        }
+    }
+
+    fn teleport(&mut self, to: &Position){
+        self.cell_position = *to;
+        let mut new_offset: Position = Position::default();
+        new_offset.y = to.y.saturating_sub(self.terminal.size().height);
+        self.offset = new_offset;
+    }
+
+    fn search(&mut self){
+        let old_position = self.cell_position.clone(); 
+        let mut direction = SearchDirection::Forward;
+        let query = self.prompt(
+            "Search (ESC to cancel, Arrows to navigate): ", 
+            |editor, key, query|{
+                let mut moved = false;
+                match key{
+                    KeyCode::Right | KeyCode::Down => {
+                        direction = SearchDirection::Forward;
+                        editor.move_cursor(KeyCode::Right);
+                        moved = true;
+                    },
+                    KeyCode::Left | KeyCode::Up => direction = SearchDirection::Backward,
+                    _ => direction = SearchDirection::Forward,
+                }
+                if let Some(position) = editor.document.find(&query, &editor.cell_position, direction){
+                    editor.cell_position = position;
+                    editor.scroll();
+                }else if moved{
+                    editor.move_cursor(KeyCode::Left);
+                }
+            }).unwrap_or(None);
+
+        if query.is_none(){
+            self.cursor_position = old_position;
+            self.scroll();
+        }
+
+        self.status = Status::default();
+    }
+
+    fn scroll(&mut self){
+        let Position {x,y} = self.cell_position;
+        let size = self.terminal.size();
+        let mut offset = &mut self.offset;
+        if y < offset.y{
+            offset.y = y;
+        }else if y >= offset.y.saturating_add(size.height){
+            offset.y = y.saturating_sub(size.height).saturating_add(1);
+        }
+
+        if x < offset.x {
+            offset.x = x;
+        } else if x >= offset.x.saturating_add(size.width) {
+            offset.x = x.saturating_sub(size.width).saturating_add(1);
         }
     }
 
@@ -360,7 +404,7 @@ impl Editor{
 
     fn draw_header(&mut self) -> Result<(), std::io::Error>{
         let alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-        let cols: usize = self.document.col_count();
+        let cols: usize = max(self.document.col_count(), self.cell_position.x.saturating_add(1));
 
         let headers: Vec<String>= if self.header {
             let col_titles = self.document.rows[0].cells.iter().map(|c| c.render(9)).collect::<Vec<String>>();
@@ -378,6 +422,7 @@ impl Editor{
             headers_str
         };
         //Columns Index Margin
+        Terminal::clear_line();
         write!(stdout(), "      ")?;
 
         for i in headers.iter().enumerate(){
@@ -420,6 +465,7 @@ impl Editor{
         if result.is_empty(){
             return Ok(None);
         }
+
         Ok(Some(result))
     }
 }
