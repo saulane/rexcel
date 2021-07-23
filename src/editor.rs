@@ -113,6 +113,10 @@ impl Editor{
                 self.quit();
             },
             Event::Key(KeyEvent{code: KeyCode::Char('f'), modifiers: KeyModifiers::CONTROL}) => self.search(),
+            Event::Key(KeyEvent{code: KeyCode::Char('w'), modifiers: KeyModifiers::CONTROL}) => {
+                self.save();
+                self.quit();
+            },
             Event::Key(KeyEvent{code: KeyCode::Char('x'), modifiers: KeyModifiers::CONTROL}) => self.cut(&curr_cell),
             Event::Key(KeyEvent{code: KeyCode::Char('c'), modifiers: KeyModifiers::CONTROL}) => self.copy(&curr_cell),
             Event::Key(KeyEvent{code: KeyCode::Char('v'), modifiers: KeyModifiers::CONTROL}) => self.paste(&curr_cell),
