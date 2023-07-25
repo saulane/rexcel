@@ -1,4 +1,4 @@
-use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
+use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers};
 use crossterm::style::Color;
 use crossterm::ErrorKind;
 
@@ -98,44 +98,60 @@ impl Editor {
             Event::Key(KeyEvent {
                 code: KeyCode::Down,
                 modifiers: _,
+                kind: KeyEventKind::Press,
+                state: KeyEventState::NONE,
             }) => {
                 self.move_cursor(KeyCode::Down);
             }
             Event::Key(KeyEvent {
                 code: KeyCode::Up,
                 modifiers: _,
+                kind: KeyEventKind::Press,
+                state: KeyEventState::NONE,
             }) => {
                 self.move_cursor(KeyCode::Up);
             }
             Event::Key(KeyEvent {
                 code: KeyCode::Right,
                 modifiers: _,
+                kind: KeyEventKind::Press,
+                state: KeyEventState::NONE,
             }) => {
                 self.move_cursor(KeyCode::Right);
             }
             Event::Key(KeyEvent {
                 code: KeyCode::Left,
                 modifiers: _,
+                kind: KeyEventKind::Press,
+                state: KeyEventState::NONE,
             }) => {
                 self.move_cursor(KeyCode::Left);
             }
             Event::Key(KeyEvent {
                 code: KeyCode::Char('q'),
                 modifiers: KeyModifiers::CONTROL,
+                kind: KeyEventKind::Press,
+                state: KeyEventState::NONE,
             }) => {
                 self.quit();
             }
             Event::Key(KeyEvent {
                 code: KeyCode::Char('f'),
                 modifiers: KeyModifiers::CONTROL,
+                kind: KeyEventKind::Press,
+                state: KeyEventState::NONE,
             }) => self.search(),
             Event::Key(KeyEvent {
                 code: KeyCode::Char('g'),
                 modifiers: KeyModifiers::CONTROL,
+                kind: KeyEventKind::Press,
+                state: KeyEventState::NONE,
             }) => self.goto(),
             Event::Key(KeyEvent {
                 code: KeyCode::Char('w'),
                 modifiers: KeyModifiers::CONTROL,
+                kind: KeyEventKind::Press,
+                state: KeyEventState::NONE,
             }) => {
                 self.save();
                 self.quit();
@@ -143,24 +159,34 @@ impl Editor {
             Event::Key(KeyEvent {
                 code: KeyCode::Char('x'),
                 modifiers: KeyModifiers::CONTROL,
+                kind: KeyEventKind::Press,
+                state: KeyEventState::NONE,
             }) => self.cut(&curr_cell),
             Event::Key(KeyEvent {
                 code: KeyCode::Char('c'),
                 modifiers: KeyModifiers::CONTROL,
+                kind: KeyEventKind::Press,
+                state: KeyEventState::NONE,
             }) => self.copy(&curr_cell),
             Event::Key(KeyEvent {
                 code: KeyCode::Char('v'),
                 modifiers: KeyModifiers::CONTROL,
+                kind: KeyEventKind::Press,
+                state: KeyEventState::NONE,
             }) => self.paste(&curr_cell),
             Event::Key(KeyEvent {
                 code: KeyCode::Backspace,
                 modifiers: _,
+                kind: KeyEventKind::Press,
+                state: KeyEventState::NONE,
             }) => {
                 self.document.delete(&self.cell_position);
             }
             Event::Key(KeyEvent {
                 code: KeyCode::Char(c),
                 modifiers,
+                kind: KeyEventKind::Press,
+                state: KeyEventState::NONE,
             }) => {
                 if c == 's' && modifiers.contains(KeyModifiers::CONTROL) {
                     if modifiers.contains(KeyModifiers::ALT) {
@@ -175,6 +201,8 @@ impl Editor {
             Event::Key(KeyEvent {
                 code: KeyCode::Delete,
                 modifiers: _,
+                kind: KeyEventKind::Press,
+                state: KeyEventState::NONE,
             }) => {
                 if self.document.cell_exist(&self.cell_position) {
                     self.document.rows[self.cell_position.y].cells[self.cell_position.x].reset()
@@ -321,11 +349,6 @@ impl Editor {
                         KeyCode::Enter => editor.teleport(&previous_pos),
                         _ => (),
                     }
-
-                    // editor.cell_position = *to;
-                    // let mut new_offset: Position = Position::default();
-                    // new_offset.y = to.y.saturating_sub(editor.terminal.size().height);
-                    // editor.offset = new_offset;
                 },
             )
             .unwrap_or(None);
@@ -362,6 +385,13 @@ impl Editor {
                             .document
                             .find(&query, &editor.cell_position, direction)
                     {
+                        editor.cell_position = position;
+                        editor.scroll();
+                    } else if let Some(position) = editor.document.find(
+                        &query,
+                        &editor.cell_position,
+                        SearchDirection::Backward,
+                    ) {
                         editor.cell_position = position;
                         editor.scroll();
                     } else if moved {
@@ -586,6 +616,8 @@ impl Editor {
             if let Event::Key(KeyEvent {
                 code: key,
                 modifiers: _,
+                kind: KeyEventKind::Press,
+                state: KeyEventState::NONE,
             }) = event
             {
                 match key {
