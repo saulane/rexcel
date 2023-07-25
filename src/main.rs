@@ -1,20 +1,18 @@
-#![warn(
-    clippy::pedantic,
-)]
+#![warn(clippy::pedantic)]
 
-mod terminal;
-mod editor;
 mod cell;
-mod row;
 mod document;
+mod editor;
+mod row;
+mod terminal;
 
+pub use cell::Cell;
+pub use document::Document;
 use editor::Editor;
 pub use editor::Position;
 pub use editor::SearchDirection;
-pub use terminal::Terminal;
-pub use cell::Cell;
 pub use row::Row;
-pub use document::Document;
+pub use terminal::Terminal;
 
 fn main() {
     let mut editor = Editor::new().unwrap();
