@@ -282,15 +282,11 @@ impl Editor {
 
         Terminal::goto(&Position { x: 0, y: 1 });
         Terminal::clear_line();
-        // write!(stdout(), "{}/{}", self.cell_position.x, self.cell_position.y)?;
-        // Terminal::clear();
         self.draw_edit_line()?;
         Terminal::goto(&Position { x: 0, y: 2 });
 
         self.draw_grid()?;
 
-        // Terminal::goto(&self.cursor_position);
-        // Terminal::show_cursor();
         Terminal::flush()
     }
 
@@ -302,9 +298,17 @@ impl Editor {
         let size = self.terminal.size();
         match key {
             KeyCode::Left => {
+                if self.cell_position.x.saturating_sub(self.offset.x) == 0 && self.offset.x > 0 {
+                    self.offset.x = self.offset.x.saturating_sub(1);
+                }
                 self.cell_position.x = self.cell_position.x.saturating_sub(1);
             }
             KeyCode::Right => {
+                if self.cell_position.x.saturating_sub(self.offset.x)
+                    == size.width.saturating_sub(1)
+                {
+                    self.offset.x = self.offset.x.saturating_add(1);
+                }
                 self.cell_position.x = self.cell_position.x.saturating_add(1);
             }
             KeyCode::Up => {
@@ -468,7 +472,7 @@ impl Editor {
         write!(stdout(), "      ")?;
         Terminal::reset_colors();
 
-        for x in 0..num_col {
+        for x in self.offset.x..num_col.saturating_add(self.offset.x) {
             self.draw_cell(&Position { x, y })?;
         }
 
@@ -493,7 +497,6 @@ impl Editor {
         for i in self.offset.y..size.height.saturating_add(self.offset.y) {
             Terminal::clear_line();
             self.draw_row(i)?;
-            // write!(stdout(), "\u{2502} {}\r\n", i/2)?;
         }
 
         Ok(())
